@@ -13,33 +13,47 @@ library(syuzhet)
 library(RSentiment)
 library(tm)
 
+
+
+# authanticate and download tweets
 setup_twitter_oauth(consumerKey, consumerSecret,accessToken, accessSecrat)
+
+#------------------------------------- processing PTI tweets ---------------------------------
 tweets_PTI <- searchTwitter("PTI", n = 1000, lang = "en")
-tweets_PMLN <- searchTwitter("PMLN", n = 1000, lang = "en")
-
-df_PTI <- ldply (tweets_PTI, function(t) t$toDataFrame())
-df_PMLN <- ldply (tweets_PMLN, function(t) t$toDataFrame())
-
-
-
-df_text_PTI <- df_PTI$text
-df_text_PMLN <- df_PMLN$text
-
+df_PTI <- ldply (tweets_PTI, function(t) t$toDataFrame())         # convert to data frame
+df_text_PTI <- df_PTI$text                                        # 
+                                                                  # eliminate emoticons
 df_text_PTI <- sapply(df_text_PTI,function(row) iconv(row, "latin1", "ASCII", sub=""))
-df_text_PMLN <- sapply(df_text_PMLN,function(row) iconv(row, "latin1", "ASCII", sub=""))
+df_text_PTI <- gsub("http[^[:blank:]]+","",df_text_PTI)           # eliminate links
+df_text_PTI <- gsub("(RT|via)((?:\\b\\W*@\\w+)+)","",df_text_PTI) # eliminate other characters 
 
 
-df_text_PTI <- gsub("http[^[:blank:]]+","",df_text_PTI)
-df_text_PTI <- gsub("(RT|via)((?:\\b\\W*@\\w+)+)","",df_text_PTI)
-
-df_text_PMLN <- gsub("http[^[:blank:]]+","",df_text_PMLN)
-df_text_PMLN <- gsub("(RT|via)((?:\\b\\W*@\\w+)+)","",df_text_PMLN)
-
-txt_PTI <- Corpus(VectorSource(df_text_PTI))
+txt_PTI <- Corpus(VectorSource(df_text_PTI))    
 txt_PTI <- tm_map(txt_PTI, removePunctuation)
 txt_PTI <- tm_map(txt_PTI,content_transformer(tolower))
 txt_PTI <- tm_map(txt_PTI, removeWords, stopwords("english"))
 txt_PTI <- tm_map(txt_PTI, stripWhitespace)
+
+sentiment_PTI <- get_nrc_sentiment(df_text_PTI)
+sentiment_score_PTI <- data.frame(colSums(sentiment_PTI[,]))
+names(sentiment_score_PTI) <- "Score"
+sentiment_score_PTI <- cbind("sentiment", rownames(sentiment_score_PTI), sentiment_score_PTI)
+names(sentiment_score_PTI) <- c("sentiment" , "Sent" ,"Score" )
+sentiment_score_PTI <- sentiment_score_PTI %>% mutate(Party = "PTI")
+
+
+#------------------------------------- processing PMLN tweets ---------------------------------
+tweets_PMLN <- searchTwitter("PMLN", n = 1000, lang = "en")
+
+df_PMLN <- ldply (tweets_PMLN, function(t) t$toDataFrame())
+df_text_PMLN <- df_PMLN$text
+df_text_PMLN <- sapply(df_text_PMLN,function(row) iconv(row, "latin1", "ASCII", sub=""))
+
+
+df_text_PMLN <- gsub("http[^[:blank:]]+","",df_text_PMLN)
+df_text_PMLN <- gsub("(RT|via)((?:\\b\\W*@\\w+)+)","",df_text_PMLN)
+
+
 
 txt_PMLN <- Corpus(VectorSource(df_text_PMLN))
 txt_PMLN <- tm_map(txt_PMLN, removePunctuation)
@@ -50,12 +64,7 @@ txt_PMLN <- tm_map(txt_PMLN, stripWhitespace)
 #pal <- brewer.pal(8,"Dark2")
 #wordcloud(txt, min.freq = 5, colors = pal, width = 1000, height =1000)
 
-sentiment_PTI <- get_nrc_sentiment(df_text_PTI)
-sentiment_score_PTI <- data.frame(colSums(sentiment_PTI[,]))
-names(sentiment_score_PTI) <- "Score"
-sentiment_score_PTI <- cbind("sentiment", rownames(sentiment_score_PTI), sentiment_score_PTI)
-names(sentiment_score_PTI) <- c("sentiment" , "Sent" ,"Score" )
-sentiment_score_PTI <- sentiment_score_PMLN %>% mutate(Party = "PTI")
+
 
 sentiment_PMLN <- get_nrc_sentiment(df_text_PMLN)
 sentiment_score_PMLN <- data.frame(colSums(sentiment_PMLN[,]))
@@ -66,4 +75,4 @@ sentiment_score_PMLN <- sentiment_score_PMLN %>% mutate(Party = "PMLN")
 
 sentiment_score <- rbind(sentiment_score_PMLN,sentiment_score_PTI)
 
-ggplot(data = sentiment_score, aes(x = Sent, y = Score)) + geom_bar(aes(fill = sentiment), stat = "identity")
+ggplot(sentiment_score, aes(x = Sent,y = Score, fill=factor(Party))) +  geom_bar(stat="identity",position="dodge") + labs(title = "PTI vs PMLN sentiment analysis", xlab = "Sentiment", ylab = "")
