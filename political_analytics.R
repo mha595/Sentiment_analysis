@@ -76,3 +76,4 @@ sentiment_score_PMLN <- sentiment_score_PMLN %>% mutate(Party = "PMLN")
 sentiment_score <- rbind(sentiment_score_PMLN,sentiment_score_PTI)
 
 ggplot(sentiment_score, aes(x = Sent,y = Score, fill=factor(Party))) +  geom_bar(stat="identity",position="dodge") + labs(title = "PTI vs PMLN sentiment analysis", xlab = "Sentiment", ylab = "")
+
